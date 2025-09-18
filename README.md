@@ -3,17 +3,7 @@ Supplementary Materials for the Paper “Terrain Gap Filling from Single-View Sa
 
 Terrain Gap Filling from Single-View Satellite Imagery Supplementary Document
 Authors
-Jianguo Pan*
-
-Huachao Yang*
-
-Zihao Lian*
-
-Peichi Zhou*
-
-Yuan Yang*
-
-Chen Li$
+Jianguo Pan*    Huachao Yang*    Zihao Lian*    Peichi Zhou*    Yuan Yang*    Chen Li$
 
 Affiliations
 *The College of Information, Mechanical and Electrical Engineering, Shanghai Normal University, China
