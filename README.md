@@ -86,7 +86,7 @@ The training and testing of the terrain prediction module and the terrain refine
 - **Batch size:** 4  
 - **Epochs:** 400
 
-![Comparison results of terrain refinement shadow masks](images/master.png)
+![Comparison results of terrain refinement shadow masks](master.png)
 
 **Figure 1.** Comparison of terrain refinement shadow masks. The first row shows the input satellite imagery and the second row presents the ground-truth masks. Rows 3–5 display the results of our method, I2E, and IMELE, respectively. Our approach yields shadow distributions closest to the ground truth, effectively capturing terrain semantics, while I2E exhibits noticeable errors and IMELE produces fragmented shadows.
 
@@ -99,7 +99,7 @@ In contrast, the shadow mask produced by the **I2E** method exhibits significant
 
 The **IMELE** method, on the other hand, generates fragmented shadows, highlighting the limitations of conventional convolutional architectures. Although convolution–deconvolution networks are able to capture local texture features, their restricted receptive fields hinder the ability to model the systematic relationships between shadow distributions and geomorphological structures in real terrain.
 
-![Comparison of terrain gap filling effects](images/min.png)
+![Comparison of terrain gap filling effects](min.png)
 
 **Figure 2.** Comparison of terrain gap filling results. The first row shows the shadow masks, followed by the ground-truth DEMs. Subsequent rows display the reconstructed terrain using our method, EC, and MEDFE, respectively. Our approach better preserves terrain continuity within shadowed regions and avoids the irregular artifacts and elevation distortions observed in EC and MEDFE.
 
