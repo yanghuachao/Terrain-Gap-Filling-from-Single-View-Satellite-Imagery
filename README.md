@@ -1,15 +1,6 @@
 # Terrain-Gap-Filling-from-Single-View-Satellite-Imagery
 Supplementary Materials for the Paper “Terrain Gap Filling from Single-View Satellite Imagery based on Prior Geographical Knowledge Constraints”
 
-Terrain Gap Filling from Single-View Satellite Imagery Supplementary Document
-
-Jianguo Pan*    Huachao Yang*    Zihao Lian*    Peichi Zhou*    Yuan Yang*    Chen Li$
-
-Affiliations
-*The College of Information, Mechanical and Electrical Engineering, Shanghai Normal University, China
-
-$School of Computer Science and Engineering, Tianjin University of Technology, China
-
 ## Related Work
 
 To address the problem of missing data in digital elevation models (DEMs), conventional approaches include manual reconstruction, integration and fusion with other data sources, as well as various interpolation techniques. However, these methods face significant limitations. Manual reconstruction is often costly in terms of time and labor, the integration of DEM from different sources frequently results in quality inconsistencies, and interpolation in complex terrain regions often fails to achieve satisfactory results [1,2,3]. Therefore, deep learning techniques, owing to their powerful data learning and pattern recognition capabilities, have gradually become the mainstream approach for addressing missing data in DEM. Unlike traditional methods, deep learning approaches are able not only to learn local terrain features but also to capture global information and contextual characteristics. This enables the model to extract latent information from consistent terrain patterns, thereby facilitating the effective reconstruction of complete DEM [4,5].
