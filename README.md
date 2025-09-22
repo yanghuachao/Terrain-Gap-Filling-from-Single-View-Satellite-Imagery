@@ -22,7 +22,80 @@ Although these methods have made certain progress in the integration of terrain 
 
 In summary, inpainting plays a crucial role in addressing missing data in DEM, and deep learning methods represented by CGANs have achieved remarkable results in terrain inpainting tasks. However, key challenges remain in further optimizing the integration and feature learning of terrain information, as well as in enhancing the model's generalization ability and refinement performance.
 
+## Method
+### Differentiable renderer based on mountain shadow priors
+
+The shadow-constrained terrain gap-filling framework renders the DEM using a differentiable renderer to obtain a shadow mask corresponding to the generated terrain, which is then employed to constrain model training. This section presents the process of generating shadow masks with a differentiable renderer.
+
+In the shadow mask generation task, to ensure that the generated shadow masks are consistent with the real shadow masks in terms of illumination, it is first necessary to determine the illumination direction corresponding to each satellite image. Then, the generated terrain is illuminated under the same lighting conditions to maintain consistent lighting effects. This study adopts the illumination direction inversion algorithm proposed by Zhou et al. (2022) to estimate the zenith and azimuth angles of the light source.
+
+The algorithm first preprocesses the satellite image to extract an approximate shadow distribution, as described in **Algorithm 1**. In each iteration, a differentiable rendering algorithm is used to render the digital elevation model, from which shadow distribution information is obtained. Then, the zenith and azimuth angles are treated as optimization targets, and the L1 distance error between the target shadow distribution and the rendering result is minimized using the Adam optimization algorithm. Finally, when the error falls below a set threshold, the accurate lighting conditions are obtained, completing the illumination inversion process.
+
 ---
+
+### Algorithm 1: Inverse Lighting Estimation
+
+**Input:**  
+- Satellite image `M`  
+- Digital elevation model `T`  
+- Threshold `ε`  
+
+**Output:**  
+- Zenith angle `θ`  
+- Azimuth angle `φ`  
+
+1. Extract approximate shadow distribution:  
+   `S_gt ← ExtractShadow(M)`  
+
+2. Initialize lighting parameters `(θ, φ)`  
+
+3. **While** `L > ε` **do**  
+   3.1 Render shadow:  
+   `S_pred ← DiffRender(T, θ, φ)`  
+
+   3.2 Optimize:  
+   `(θ, φ) ← AdamOpt(L, θ, φ)`  
+
+4. **Return** `(θ, φ)`  
+
+
+For the reconstructed terrain, the method simulates sunlight with white light and applies white as the terrain texture. The zenith and azimuth angles obtained from illumination inversion are used as the lighting direction for rendering. Subsequently, the method uses a differentiable image processing algorithm to convert the rendered result from the RGB color space to the YUV color space to better capture the luminance and chrominance information of the rendered image. Then, a differentiable contrast-limited adaptive histogram equalization algorithm is applied to the YUV image to enhance local contrast. Finally, the processed image is converted back to the RGB color space to obtain the final shadow mask.
+## Experimental Results and Analysis
+
+The training and testing of the terrain prediction module and the terrain refinement module are conducted in the **Python 3.8.19** and **PyTorch 1.13.0** environment, deployed on a desktop computer equipped with an **NVIDIA GeForce RTX 3090 Ti 24GB GPU** and an **Intel Core i5-13600K 3.50 GHz CPU**. The satellite image in the dataset is obtained from Google Maps at a zoom level of **12**, and the corresponding DEMs are derived from [Tangrams Heightmapper](https://tangrams.github.io/heightmapper/), maintaining the same zoom level. Both the satellite images and the DEMs are processed at a resolution of **256 × 256**. The training set consists of **4,096** paired samples of satellite imagery, DEMs, and shadow masks, while the testing set contains **1,024** samples.
+
+
+### Training Details
+
+#### Terrain Prediction Module
+- **Optimizer:** Adam  
+- **Initial learning rate:** 0.0003 (linear scheduling)  
+- **Momentum parameters:**  
+  - β₁ = 0.5  
+  - β₂ = 0.999  
+- **Loss weighting coefficients:**  
+  - λ<sub>g₁</sub> = 1.1  
+  - λ<sub>m</sub> = 2.0  
+  - λ<sub>t</sub> = 0.5  
+  - λ<sub>s</sub> = 10⁻⁴  
+- **Batch size:** 4  
+- **Epochs:** 300  
+
+#### Terrain Refinement Module
+- **Optimizer:** Adam  
+- **Initial learning rate:** 0.0002  
+- **Momentum parameters:**  
+  - β₁ = 0.9  
+  - β₂ = 0.999  
+- **Loss weighting coefficients:**  
+  - λ<sub>g₂</sub> = 1.0  
+  - λ<sub>m</sub> = 2.0  
+  - λ<sub>i</sub> = 1.5  
+  - λ<sub>s</sub> = 10⁻⁴  
+  - λ<sub>k</sub> = 0.8  
+- **Batch size:** 4  
+- **Epochs:** 400  
+
 
 ### References
 [1] F. Hallo, G. Falorni, and R. L. Bras, *Characterization and quantification of data voids in the shuttle radar topography mission data*, IEEE Geosci. Remote Sens. Lett., vol. 2, no. 2, pp. 177–181, 2005.  
