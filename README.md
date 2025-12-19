@@ -34,24 +34,33 @@ Let `Ck` denote a block of **Convolution-BatchNorm-ReLU** with `k` filters.
 Let `CDk` denote a block of **Convolution-BatchNorm-Dropout-ReLU** with `k` filters.
 
 **Encoder Stack:**
-1.  **C64** (4x4 conv, stride 2, LeakyReLU 0.2) *[No BatchNorm in the first layer]*
-2.  **C128** (4x4 conv, stride 2, LeakyReLU 0.2)
-3.  **C256** (4x4 conv, stride 2, LeakyReLU 0.2)
-4.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
-5.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
-6.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
-7.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
-8.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2) *[Bottleneck]*
+The encoder progressively downsamples the $256 \times 256$ input image to extract features.
+
+| Layer ID | Input Resolution | Operation | Kernel / Stride | Filters | Activation | 
+| :--- | :--- | :--- | :--- | :--- | :--- | 
+| **En1** | $256 \times 256$ | Conv2d | $4 \times 4$ / 2 | 64 | LeakyReLU (0.2) | 
+| **En2** | $128 \times 128$ | Conv2d | $4 \times 4$ / 2 | 128 | LeakyReLU (0.2) |
+| **En3** | $64 \times 64$ | Conv2d | $4 \times 4$ / 2 | 256 | LeakyReLU (0.2) | 
+| **En4** | $32 \times 32$ | Conv2d | $4 \times 4$ / 2 | 512 | LeakyReLU (0.2) | 
+| **En5** | $16 \times 16$ | Conv2d | $4 \times 4$ / 2 | 512 | LeakyReLU (0.2) |
+| **En6** | $8 \times 8$ | Conv2d | $4 \times 4$ / 2 | 512 | LeakyReLU (0.2) | 
+| **En7** | $4 \times 4$ | Conv2d | $4 \times 4$ / 2 | 512 | LeakyReLU (0.2) |
+| **En8** | $2 \times 2$ | Conv2d | $4 \times 4$ / 2 | 512 | LeakyReLU (0.2) |
 
 **Decoder Stack (with Skip Connections):**
-1.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 7
-2.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 6
-3.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 5
-4.  **C512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 4
-5.  **C256** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 3
-6.  **C128** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 2
-7.  **C64** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 1
-8.  **Output Layer**: 4x4 transposed conv, stride 2, **Tanh** Activation $\to$ Output Image ($256 \times 256 \times 3$)
+The decoder recovers resolution using transposed convolutions and concatenates features from the encoder via skip connections.
+
+| Layer ID | Input Resolution | Operation | Kernel / Stride | Filters | Skip Connection (Concat) | Activation |
+| :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| **De1** | $1 \times 1$ | Transposed Conv | $4 \times 4$ / 2 | 512 |  - | ReLU |
+| **De2** | $2 \times 2$ | Transposed Conv | $4 \times 4$ / 2 | 512 |  **En7** | ReLU |
+| **De3** | $4 \times 4$ | Transposed Conv | $4 \times 4$ / 2 | 512 |  **En6** | ReLU |
+| **De4** | $8 \times 8$ | Transposed Conv | $4 \times 4$ / 2 | 512 |  **En5** | ReLU |
+| **De5** | $16 \times 16$ | Transposed Conv | $4 \times 4$ / 2 | 256 |  **En4** | ReLU |
+| **De6** | $32 \times 32$ | Transposed Conv | $4 \times 4$ / 2 | 128 |  **En3** | ReLU |
+| **De7** | $64 \times 64$ | Transposed Conv | $4 \times 4$ / 2 | 64 |   **En2** | ReLU |
+| **Output**| $128 \times 128$| Transposed Conv | $4 \times 4$ / 2 | 3 | **En1** | **Tanh** |
+
 
 ---
 
@@ -65,15 +74,16 @@ The discriminator is a Markovian discriminator (PatchGAN) that classifies $N \ti
 *   **Output:** The final D score is the average of all patch predictions.
 
 ##### Layer Specification
-Let `Ck` denote **Convolution-BatchNorm-LeakyReLU**.
+The discriminator takes a 6-channel input (Source Image + Target/Generated Image) and outputs a $30 \times 30$ feature matrix.
 
-1.  **Input:** Concatenation of Source Image ($x$) and Target/Generated Image ($y$) $\to$ 6 channels.
-2.  **C64** (4x4 conv, stride 2, LeakyReLU 0.2) *[No BatchNorm]*
-3.  **C128** (4x4 conv, stride 2, LeakyReLU 0.2)
-4.  **C256** (4x4 conv, stride 2, LeakyReLU 0.2)
-5.  **C512** (4x4 conv, stride 1, LeakyReLU 0.2)
-6.  **Output Layer**: 4x4 conv, stride 1, **Sigmoid** Activation.
-    *   *Output Shape:* $30 \times 30 \times 1$ map of validity scores.
+| Layer | Input Channels | Operation | Kernel / Stride | Filters | Activation |
+| :--- | :--- | :--- | :--- | :--- | :--- | 
+| **Input** | 6 | - | - | - | - | - | Source + Target |
+| **Layer 1**| 6 | Conv2d | $4 \times 4$ / 2 | 64 | LeakyReLU (0.2) | 
+| **Layer 2**| 64 | Conv2d | $4 \times 4$ / 2 | 128 | LeakyReLU (0.2) |
+| **Layer 3**| 128 | Conv2d | $4 \times 4$ / 2 | 256 | LeakyReLU (0.2) | 
+| **Layer 4**| 256 | Conv2d | $4 \times 4$ / **1** | 512 | LeakyReLU (0.2) | 
+| **Output** | 512 | Conv2d | $4 \times 4$ / **1** | 1 | **Sigmoid** |  
 
 ---
 
@@ -112,7 +122,7 @@ The algorithm first preprocesses the satellite image to extract an approximate s
 
 
 For the reconstructed terrain, the method simulates sunlight with white light and applies white as the terrain texture. The zenith and azimuth angles obtained from illumination inversion are used as the lighting direction for rendering. Subsequently, the method uses a differentiable image processing algorithm to convert the rendered result from the RGB color space to the YUV color space to better capture the luminance and chrominance information of the rendered image. Then, a differentiable contrast-limited adaptive histogram equalization algorithm is applied to the YUV image to enhance local contrast. Finally, the processed image is converted back to the RGB color space to obtain the final shadow mask.
-## Experimental Results and Analysis
+### Experimental Results and Analysis
 
 The training and testing of the terrain prediction module and the terrain refinement module are conducted in the Python 3.8.19 and PyTorch 1.13.0 environment, deployed on a desktop computer equipped with an NVIDIA GeForce RTX 3090 Ti 24GB GPU and an Intel Core i5-13600K 3.50 GHz CPU. The satellite image in the dataset is obtained from Google Maps at a zoom level of 12, and the corresponding DEMs are derived from [Tangrams Heightmapper](https://tangrams.github.io/heightmapper/), maintaining the same zoom level. Both the satellite images and the DEMs are processed at a resolution of 256 × 256. The training set consists of 4,096 paired samples of satellite imagery, DEMs, and shadow masks, while the testing set contains 1,024 samples.
 
@@ -120,6 +130,67 @@ The training and testing of the terrain prediction module and the terrain refine
 ### Training Details
 
 #### Terrain Prediction Module
+#### Loss Function Design for the Terrain Prediction Module
+
+To achieve high-fidelity reconstruction of terrain in illuminated areas, the terrain prediction module incorporates several complementary loss functions. These functions constrain the generated Digital Elevation Model (DEM) from multiple dimensions, including geometric consistency, visual realism, and physical plausibility.
+
+##### 1. Shadow Mask Loss $L_{mask}$
+
+The Shadow Mask Loss is designed to enforce consistency between the shadow distribution generated by the predicted terrain and that of the real terrain under identical lighting conditions.
+
+$$
+L_{mask} = \left\| R\left(\theta, \phi, T_{gt}\right) - R\left(\theta, \phi, T_{pred}\right) \right\|_{2}^{2}
+$$
+
+Where:
+- $T_{gt}$ : The real terrain (Ground Truth DEM)
+- $T_{pred}$ : The generated/predicted terrain  
+- $\theta, \phi$ : The zenith angle and azimuth angle of the light source
+- $R(\cdot)$ : A differentiable rendering function used to generate terrain shadow masks
+
+**Purpose Explanation:**
+
+By minimizing the difference between the shadow masks of the real and generated terrain, this loss effectively constrains the location of shadow boundaries. This process gradually approximates the true elevation within the illuminated areas, leading to precise reconstruction of the terrain's geometric structure.
+##### 2. Style Loss $L_{style}$
+
+The Style Loss is used to enhance the consistency between the generated terrain and the real terrain in terms of texture structure and high-frequency details.
+
+$$
+L_{style} = \left\| \mathrm{Gram}(T_{gt}) - \mathrm{Gram}(T_{pred}) \right\|_{1}
+$$
+
+Where:
+- $\mathrm{Gram}(\cdot)$ : Gram matrix, used to characterize the correlation between different terrain structures
+- $\|\cdot\|_{1}$ : L1 norm
+
+**Purpose Explanation:**
+
+By comparing the Gram matrices of the generated and real terrain, the Style Loss encourages the model to learn the overall structural style and local high-frequency features of real terrain, thereby improving the visual quality and detail realism of the generated DEM.
+
+---
+
+##### 3. Slope Loss $L_{slope}$
+
+The Slope Loss is used to constrain the rationality of the generated terrain in terms of overall geomorphological form, ensuring that elevation changes conform to natural terrain evolution patterns.
+
+**Purpose Explanation:**
+
+This loss helps enhance the continuity and smoothness of the terrain surface, avoiding unreasonable abrupt slope changes, thereby improving the geomorphological consistency of the generated terrain at the global scale.
+
+---
+
+##### 4. Overall Loss Function
+
+The final optimization objective of the terrain prediction module consists of multiple weighted loss functions:
+
+$$
+L_{predict} = \lambda_{g1} L_{G1} + \lambda_{m} L_{mask} + \lambda_{t} L_{style} + \lambda_{s} L_{slope}
+$$
+
+Where:
+- $L_{G1}$ : The base loss of the generator
+- $\lambda_{g1}, \lambda_{m}, \lambda_{t}, \lambda_{s}$ : Weight coefficients for each loss term
+#### Hyperparameter Optimization
 - **Optimizer:** Adam  
 - **Initial learning rate:** 0.0003 (linear scheduling)  
 - **Momentum parameters:**  
@@ -131,9 +202,109 @@ The training and testing of the terrain prediction module and the terrain refine
   - λ<sub>t</sub> = 0.5  
   - λ<sub>s</sub> = 10⁻⁴  
 - **Batch size:** 4  
-- **Epochs:** 300  
+- **Epochs:** 300
+  
 
 #### Terrain Refinement Module
+##### Loss Function Design for the Terrain Refinement Module
+Although the terrain prediction module can achieve high-fidelity terrain reconstruction in non-shadowed areas, the geometric accuracy of terrain in shadow-occluded regions is difficult to guarantee due to information loss and multi-solution problems.
+
+To address this, the **Terrain Refinement Module** performs targeted reconstruction of shadowed areas through **void filling** techniques, and introduces multiple loss functions to enhance geometric rationality and continuity.
+
+---
+
+##### 1. Shadow Mask Loss $L_{mask}$
+
+Similar to the prediction module, the refinement module also introduces a shadow mask loss based on differentiable rendering:
+
+$$
+L_{mask} = \left\| R(\theta, \varphi, T_{gt}) - R(\theta, \varphi, T_{pred}) \right\|_{2}^{2}
+$$
+
+**Key Difference:**
+
+| Module | Purpose of $L_{mask}$ |
+|--------|----------------------|
+| Prediction Module | Mainly constrains geometric consistency in **illuminated regions** |
+| Refinement Module | Mainly regulates terrain generation in **shadow regions** to mitigate geometric uncertainty caused by shadows |
+
+**Purpose:**
+
+Through shadow distribution consistency constraints, this loss limits geometric deviation of generated terrain in shadow regions and reduces instability caused by multi-solution problems.
+
+---
+
+##### 2. Inpainting Loss $L_{inpainting}$
+
+Treating shadow regions as areas to be repaired, we introduce an inpainting loss similar to image restoration tasks, computing errors only within shadow regions.
+
+$$
+L_{inpainting} = \left\| (T_{pred} \odot mask) - (T_{gt} \odot mask) \right\|_{1}
+$$
+
+**Where:**
+- $mask$ : Shadow mask, used to identify regions that need to be filled
+- $\odot$ : Element-wise multiplication
+- $\|\cdot\|_{1}$ : L1 norm
+
+**Purpose:**
+- Specifically constrains elevation restoration in shadow (missing) regions
+- Improves the realism and accuracy of terrain in shadow areas
+- Effectively guides the void filling model to focus on incomplete regions
+
+---
+
+##### 3. Curvature Loss $L_{curv}$
+
+To ensure smooth transitions and geomorphological continuity between shadow and illuminated regions, we introduce a global constraint based on **Gaussian Curvature**.
+
+##### Gaussian Curvature Definition
+
+$$
+K = \frac{f_{xx} \cdot f_{yy} - f_{xy}^{2}}{(1 + f_{x}^{2} + f_{y}^{2})^{3/2}}
+$$
+
+**Where:**
+- $f_{x}, f_{y}$ : First-order partial derivatives (slope)
+- $f_{xx}, f_{yy}$ : Second-order partial derivatives
+- $f_{xy}$ : Mixed second-order partial derivative
+
+##### Curvature Loss Function
+
+$$
+L_{curv} = \frac{1}{N} \sum_{i,j} \left( K_{true}(i,j) - K_{pred}(i,j) \right)^{2}
+$$
+
+**Where:**
+- $N$ : Total number of pixels
+- $K_{true}(i,j)$ : Gaussian curvature of ground-truth terrain at position $(i,j)$
+- $K_{pred}(i,j)$ : Gaussian curvature of generated terrain at position $(i,j)$
+
+**Purpose:**
+- Constrains curvature consistency between void-filled regions and known regions
+- Avoids unnatural terrain discontinuities and abrupt curvature changes
+- Improves overall physical plausibility of the terrain
+
+---
+
+##### 4. Overall Loss Function
+
+The final loss function of the terrain refinement module is defined as:
+
+$$
+L_{refine} = \lambda_{g2} L_{G2} + \lambda_{m} L_{mask} + \lambda_{i} L_{inpainting} + \lambda_{k} L_{curv}
+$$
+
+**Parameter Description:**
+
+| Parameter | Description |
+|-----------|-------------|
+| $L_{G2}$ | Base loss of the generator in the refinement stage |
+| $\lambda_{g2}$ | Weight for generator loss |
+| $\lambda_{m}$ | Weight for shadow mask loss |
+| $\lambda_{i}$ | Weight for inpainting loss |
+| $\lambda_{k}$ | Weight for curvature constraint loss |
+#### Hyperparameter Optimization
 - **Optimizer:** Adam  
 - **Initial learning rate:** 0.0002  
 - **Momentum parameters:**  
