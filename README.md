@@ -15,6 +15,67 @@ In summary, inpainting plays a crucial role in addressing missing data in DEMs, 
 
 
 ## Method
+### Network Architecture Details
+
+Our model follows the **pix2pix** architecture[12], which uses a Conditional Generative Adversarial Network (cGAN) to learn a mapping from input images to output images.
+
+#### 1. Generator ($G$): U-Net-256
+
+The generator's goal is to translate the input image into a realistic output image. We utilize a **U-Net** architecture with skip connections to preserve low-level structural information.
+
+##### Architecture Design
+Unlike a standard Encoder-Decoder which bottlenecks information, the U-Net adds **skip connections** between layer $i$ and layer $n-i$.
+*   **Input Resolution:** $256 \times 256 \times 3$
+*   **Skip Connections:** Concatenate channels from the encoder layer $i$ with the decoder layer $n-i$.
+*   **Dropout:** Applied to the first few layers of the decoder (even at test time) to introduce stochasticity.
+
+##### Layer Specification
+Let `Ck` denote a block of **Convolution-BatchNorm-ReLU** with `k` filters.
+Let `CDk` denote a block of **Convolution-BatchNorm-Dropout-ReLU** with `k` filters.
+
+**Encoder Stack:**
+1.  **C64** (4x4 conv, stride 2, LeakyReLU 0.2) *[No BatchNorm in the first layer]*
+2.  **C128** (4x4 conv, stride 2, LeakyReLU 0.2)
+3.  **C256** (4x4 conv, stride 2, LeakyReLU 0.2)
+4.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
+5.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
+6.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
+7.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2)
+8.  **C512** (4x4 conv, stride 2, LeakyReLU 0.2) *[Bottleneck]*
+
+**Decoder Stack (with Skip Connections):**
+1.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 7
+2.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 6
+3.  **CD512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 5
+4.  **C512** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 4
+5.  **C256** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 3
+6.  **C128** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 2
+7.  **C64** (4x4 transposed conv, stride 2, ReLU) + Concat with Encoder layer 1
+8.  **Output Layer**: 4x4 transposed conv, stride 2, **Tanh** Activation $\to$ Output Image ($256 \times 256 \times 3$)
+
+---
+
+#### 2. Discriminator ($D$): 70x70 PatchGAN
+
+The discriminator is a Markovian discriminator (PatchGAN) that classifies $N \times N$ patches of the image as real or fake, rather than classifying the entire image at once.
+
+##### Design Principles
+*   **Why PatchGAN?** L1 loss is sufficient for capturing low frequencies (colors, general structure) but fails at high frequencies (sharp edges, textures). The PatchGAN restricts attention to local image patches to model high-frequency structures.
+*   **Receptive Field:** This implementation uses a **70x70** receptive field. This means each output neuron in the discriminator's final $30 \times 30$ grid sees a $70 \times 70$ pixel region of the input image.
+*   **Output:** The final D score is the average of all patch predictions.
+
+##### Layer Specification
+Let `Ck` denote **Convolution-BatchNorm-LeakyReLU**.
+
+1.  **Input:** Concatenation of Source Image ($x$) and Target/Generated Image ($y$) $\to$ 6 channels.
+2.  **C64** (4x4 conv, stride 2, LeakyReLU 0.2) *[No BatchNorm]*
+3.  **C128** (4x4 conv, stride 2, LeakyReLU 0.2)
+4.  **C256** (4x4 conv, stride 2, LeakyReLU 0.2)
+5.  **C512** (4x4 conv, stride 1, LeakyReLU 0.2)
+6.  **Output Layer**: 4x4 conv, stride 1, **Sigmoid** Activation.
+    *   *Output Shape:* $30 \times 30 \times 1$ map of validity scores.
+
+---
 ### Differentiable renderer based on mountain shadow priors
 
 The shadow-constrained terrain gap-filling framework renders the DEM using a differentiable renderer to obtain a shadow mask corresponding to the generated terrain, which is then employed to constrain model training. This section presents the process of generating shadow masks with a differentiable renderer.
@@ -112,3 +173,4 @@ As illustrated in **Figure 2**, our method demonstrates a clear advantage over t
 [9] Z. Qiu, L. Yue, and X. Liu, *Void-filling of digital elevation models with a terrain texture learning model based on generative adversarial networks*, Remote Sens., vol. 11, no. 23, pp. 2829, 2019.  
 [10] S. Li, G. Hu, X. Cheng, et al., *Integrating topographic knowledge into deep learning for the void-filling of digital elevation models*, Remote Sens. Environ., vol. 269, pp. 112818, 2022.  
 [11] G. Zhou, B. Song, P. Liang, et al., *Voids filling of DEM with multi-attention generative adversarial network model*, Remote Sens., vol. 14, no. 5, pp. 1206, 2022.  
+[12] Isola, P., Zhu, J. Y., Zhou, T., & Efros, A. A. (2017). Image-to-image translation with conditional adversarial networks. CVPR.
